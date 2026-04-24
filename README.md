@@ -4,6 +4,7 @@
 
 ## 系統功能
 
+- 圖形化 Web GUI
 - 查詢帳戶餘額 `check money`
 - 查詢交易紀錄 `check log`
 - 進行轉帳 `transaction`
@@ -86,6 +87,27 @@
 docker compose up -d
 docker compose restart
 ```
+
+## 圖形化介面
+
+啟動後可直接用瀏覽器開啟：
+
+- `http://localhost:8001` 對應 `node1`
+- `http://localhost:8002` 對應 `node2`
+- `http://localhost:8003` 對應 `node3`
+
+GUI 可直接操作：
+
+- 查詢餘額
+- 查詢交易紀錄
+- 送出轉帳
+- 驗鏈與獎勵
+- 節點狀態查詢
+- 一致性檢查
+- `tx_id` 查詢
+- 帳戶排行榜
+- 操作紀錄查詢
+- 查看完整區塊鏈
 
 ## 基本操作
 

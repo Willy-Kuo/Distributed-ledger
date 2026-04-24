@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 
+BASE_DIR = Path(__file__).resolve().parent
+WEB_DIR = BASE_DIR / "web"
 SHARE_DIR = Path(os.environ.get("LEDGER_SHARE_DIR", "/share"))
 NODE_ID = os.environ.get("NODE_ID", "node1")
 NODE_DIR = SHARE_DIR / "nodes" / NODE_ID
@@ -708,13 +710,37 @@ STORE = LedgerStore()
 class LedgerHandler(BaseHTTPRequestHandler):
     server_version = "LedgerHTTP/3.0"
 
-    def _send_json(self, status: int, payload: Dict[str, Any]) -> None:
-        body = json.dumps(payload, indent=2, ensure_ascii=True).encode("utf-8")
+    def _send_text(self, status: int, body: bytes, content_type: str) -> None:
         self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_json(self, status: int, payload: Dict[str, Any]) -> None:
+        body = json.dumps(payload, indent=2, ensure_ascii=True).encode("utf-8")
+        self._send_text(status, body, "application/json; charset=utf-8")
+
+    def _serve_static(self, relative_path: str) -> bool:
+        file_map = {
+            "/": WEB_DIR / "index.html",
+            "/index.html": WEB_DIR / "index.html",
+            "/styles.css": WEB_DIR / "styles.css",
+            "/app.js": WEB_DIR / "app.js",
+        }
+        target = file_map.get(relative_path)
+        if not target or not target.exists():
+            return False
+        if target.suffix == ".html":
+            content_type = "text/html; charset=utf-8"
+        elif target.suffix == ".css":
+            content_type = "text/css; charset=utf-8"
+        elif target.suffix == ".js":
+            content_type = "application/javascript; charset=utf-8"
+        else:
+            content_type = "application/octet-stream"
+        self._send_text(HTTPStatus.OK, target.read_bytes(), content_type)
+        return True
 
     def _read_json(self) -> Dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
@@ -726,6 +752,8 @@ class LedgerHandler(BaseHTTPRequestHandler):
         parts = parsed.path.strip("/").split("/") if parsed.path.strip("/") else []
 
         try:
+            if self._serve_static(parsed.path):
+                return
             if parsed.path == "/health":
                 self._send_json(HTTPStatus.OK, {"status": "ok", "node_id": NODE_ID, "timestamp": utc_now()})
                 return

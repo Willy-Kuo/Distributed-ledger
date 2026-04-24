@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Distributed Ledger Console</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Docker Distributed Ledger</p>
+          <h1>分散式帳本控制台</h1>
+          <p class="hero-copy">
+            在同一個介面操作查餘額、轉帳、驗鏈、節點狀態與同步一致性。每個節點各自提供這個頁面，你目前看到的是
+            <span id="current-node">載入中</span>。
+          </p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-card">
+            <span>目前節點</span>
+            <strong id="hero-node">-</strong>
+          </div>
+          <div class="meta-card">
+            <span>快捷入口</span>
+            <div class="quick-links">
+              <a href="http://localhost:8001" target="_blank" rel="noreferrer">node1</a>
+              <a href="http://localhost:8002" target="_blank" rel="noreferrer">node2</a>
+              <a href="http://localhost:8003" target="_blank" rel="noreferrer">node3</a>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main class="dashboard">
+        <section class="panel panel-wide">
+          <div class="panel-head">
+            <h2>即時摘要</h2>
+            <button id="refresh-summary" class="ghost-button">重新整理</button>
+          </div>
+          <div class="summary-grid">
+            <div class="summary-card">
+              <span>節點數</span>
+              <strong id="summary-node-count">-</strong>
+            </div>
+            <div class="summary-card">
+              <span>最後區塊數</span>
+              <strong id="summary-block-count">-</strong>
+            </div>
+            <div class="summary-card">
+              <span>Pending 交易</span>
+              <strong id="summary-pending">-</strong>
+            </div>
+            <div class="summary-card">
+              <span>一致性</span>
+              <strong id="summary-consistency">-</strong>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>帳戶查詢</h2>
+          </div>
+          <form id="balance-form" class="stack-form">
+            <label>
+              帳戶名稱
+              <input name="account" placeholder="alice" required />
+            </label>
+            <button type="submit">查詢餘額</button>
+          </form>
+          <form id="log-form" class="stack-form">
+            <label>
+              帳戶名稱
+              <input name="account" placeholder="alice" required />
+            </label>
+            <button type="submit" class="secondary">查詢交易紀錄</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>轉帳與驗鏈</h2>
+          </div>
+          <form id="transaction-form" class="stack-form">
+            <label>
+              轉出帳戶
+              <input name="from" placeholder="alice" required />
+            </label>
+            <label>
+              轉入帳戶
+              <input name="to" placeholder="bob" required />
+            </label>
+            <label>
+              金額
+              <input name="amount" type="number" min="0.01" step="0.01" placeholder="10" required />
+            </label>
+            <button type="submit">送出交易</button>
+          </form>
+          <form id="chain-form" class="stack-form">
+            <label>
+              驗鏈獎勵帳戶
+              <input name="rewardTo" placeholder="auditor" />
+            </label>
+            <button type="submit" class="secondary">檢查區塊鏈</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>節點與分析</h2>
+          </div>
+          <div class="button-stack">
+            <button id="status-button" class="secondary" type="button">節點狀態</button>
+            <button id="consistency-button" class="secondary" type="button">一致性檢查</button>
+            <button id="leaderboard-button" class="secondary" type="button">排行榜</button>
+            <button id="operations-button" class="secondary" type="button">操作紀錄</button>
+            <button id="chain-button" class="secondary" type="button">查看完整區塊鏈</button>
+          </div>
+          <form id="tx-form" class="stack-form compact">
+            <label>
+              交易 ID
+              <input name="txId" id="tx-id-input" placeholder="貼上 tx_id" required />
+            </label>
+            <button type="submit" class="secondary">查詢交易</button>
+          </form>
+        </section>
+
+        <section class="panel panel-wide result-panel">
+          <div class="panel-head">
+            <h2>回應結果</h2>
+            <div class="result-actions">
+              <span id="result-status">等待操作</span>
+              <button id="copy-result" class="ghost-button" type="button">複製 JSON</button>
+            </div>
+          </div>
+          <pre id="result-output">{
+  "message": "GUI ready"
+}</pre>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
