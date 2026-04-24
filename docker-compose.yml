@@ -1,0 +1,89 @@
+name: ledger-demo
+
+services:
+  node1:
+    image: python:3.11-slim
+    container_name: node1
+    working_dir: /app
+    command: ["python", "/app/ledger_server.py"]
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./:/app
+      - ./share:/share
+    environment:
+      LEDGER_SHARE_DIR: /share
+      LEDGER_PORT: 8000
+      NODE_ID: node1
+      PEER_URLS: http://node2:8000,http://node3:8000
+
+  node2:
+    image: python:3.11-slim
+    container_name: node2
+    working_dir: /app
+    command: ["python", "/app/ledger_server.py"]
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./:/app
+      - ./share:/share
+    environment:
+      LEDGER_SHARE_DIR: /share
+      LEDGER_PORT: 8000
+      NODE_ID: node2
+      PEER_URLS: http://node1:8000,http://node3:8000
+
+  node3:
+    image: python:3.11-slim
+    container_name: node3
+    working_dir: /app
+    command: ["python", "/app/ledger_server.py"]
+    ports:
+      - "8003:8000"
+    volumes:
+      - ./:/app
+      - ./share:/share
+    environment:
+      LEDGER_SHARE_DIR: /share
+      LEDGER_PORT: 8000
+      NODE_ID: node3
+      PEER_URLS: http://node1:8000,http://node2:8000
+
+  client1:
+    image: python:3.11-slim
+    container_name: client1
+    working_dir: /app
+    command: ["sleep", "infinity"]
+    depends_on:
+      - node1
+    volumes:
+      - ./:/app
+      - ./share:/share
+    environment:
+      LEDGER_URL: http://node1:8000
+
+  client2:
+    image: python:3.11-slim
+    container_name: client2
+    working_dir: /app
+    command: ["sleep", "infinity"]
+    depends_on:
+      - node2
+    volumes:
+      - ./:/app
+      - ./share:/share
+    environment:
+      LEDGER_URL: http://node2:8000
+
+  client3:
+    image: python:3.11-slim
+    container_name: client3
+    working_dir: /app
+    command: ["sleep", "infinity"]
+    depends_on:
+      - node3
+    volumes:
+      - ./:/app
+      - ./share:/share
+    environment:
+      LEDGER_URL: http://node3:8000

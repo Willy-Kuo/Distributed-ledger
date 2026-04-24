@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+share/blocks/
+share/meta.json
+share/pending_transactions.json
+share/nodes/
+share/ledger.json
+share_test/
+share_test_cluster/
