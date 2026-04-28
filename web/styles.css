@@ -253,3 +253,22 @@ button.ghost-button {
     padding: 16px;
   }
 }
+
+button.danger-button {
+  color: white;
+  background: linear-gradient(135deg, #dc2626, #991b1b);
+}
+
+button.danger-button:hover {
+  box-shadow: 0 10px 20px rgba(220, 38, 38, 0.2);
+}
+
+.text-danger {
+  color: #dc2626 !important;
+  font-weight: bold;
+}
+
+.text-success {
+  color: #16a34a !important;
+  font-weight: bold;
+}

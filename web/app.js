@@ -57,7 +57,16 @@ async function refreshSummary() {
   document.getElementById("summary-pending").textContent = String(
     nodes.reduce((sum, node) => sum + (node.pending_count || 0), 0),
   );
-  document.getElementById("summary-consistency").textContent = consistency.consistent ? "一致" : "不一致";
+  
+  // 更新一致性燈號與文字
+  const consText = document.getElementById("summary-consistency");
+  if (consistency.consistent) {
+      consText.textContent = "✅ 一致";
+      consText.className = "text-success";
+  } else {
+      consText.textContent = "⚠️ 發生分歧";
+      consText.className = "text-danger";
+  }
 
   const handledBy = status.handled_by || "-";
   currentNode.textContent = handledBy;
@@ -86,6 +95,7 @@ document.getElementById("transaction-form").addEventListener("submit", async (ev
         from: form.get("from"),
         to: form.get("to"),
         amount: Number(form.get("amount")),
+        signature: form.get("signature") // 新增：傳遞數位簽章
       }),
     }),
   );
@@ -121,6 +131,62 @@ document.getElementById("status-button").addEventListener("click", async () => {
 document.getElementById("consistency-button").addEventListener("click", async () => {
   await runAction("一致性檢查", () => callApi("/status/consistency"));
   await refreshSummary();
+});
+
+// 新增：多數決自動修復功能
+document.getElementById("repair-button").addEventListener("click", async () => {
+  await runAction("自動修復共識 (多數決)", async () => {
+      const consistency = await callApi("/status/consistency");
+      if (consistency.consistent) {
+         return { message: "✅ 目前網路已達共識，無需修復。" };
+      }
+      
+      const nodes = consistency.nodes;
+      const hashCounts = {};
+      nodes.forEach(n => {
+          const h = n.last_block_hash;
+          if (h) hashCounts[h] = (hashCounts[h] || 0) + 1;
+      });
+      
+      // 找出獲得最多票數的 Hash
+      const majorityHash = Object.keys(hashCounts).reduce((a, b) => hashCounts[a] > hashCounts[b] ? a : b);
+      const sourceNodeInfo = nodes.find(n => n.last_block_hash === majorityHash);
+      if (!sourceNodeInfo) throw new Error("無法找到多數決正確節點");
+
+      const portMap = { "node1": 8001, "node2": 8002, "node3": 8003 };
+      const sourcePort = portMap[sourceNodeInfo.node_id];
+
+      // 【關鍵修正】使用 .text() 取得未經 JS 解析的原始字串，保留 Python 的 .0 格式
+      const snapRes = await fetch(`http://localhost:${sourcePort}/chain`);
+      if (!snapRes.ok) throw new Error("無法從正確節點下載快照");
+      const snapshotText = await snapRes.text();
+
+      // 針對錯誤節點進行強制覆寫 (/sync)
+      const repairResults = [];
+      for (const n of nodes) {
+         if (n.last_block_hash !== majorityHash) {
+             const badPort = portMap[n.node_id];
+             try {
+                 const syncRes = await fetch(`http://localhost:${badPort}/sync`, {
+                     method: 'POST',
+                     headers: { 'Content-Type': 'application/json' },
+                     body: snapshotText // 直接傳遞原始字串，不透過 JSON.stringify
+                 });
+                 repairResults.push({ node: n.node_id, status: syncRes.ok ? "✅ 修復成功" : "❌ 修復失敗" });
+             } catch (e) {
+                 repairResults.push({ node: n.node_id, status: `❌ 連線失敗: ${e.message}` });
+             }
+         }
+      }
+      
+      await refreshSummary();
+      return { 
+          message: "🔧 修復程序完成", 
+          majority_hash: majorityHash,
+          source_node: sourceNodeInfo.node_id,
+          results: repairResults 
+      };
+  });
 });
 
 document.getElementById("leaderboard-button").addEventListener("click", async () => {

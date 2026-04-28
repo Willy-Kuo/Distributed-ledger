@@ -253,6 +253,7 @@ class LedgerStore:
         note: Optional[str] = None,
         tx_id: Optional[str] = None,
         timestamp: Optional[str] = None,
+        signature: Optional[str] = None,
     ) -> Dict[str, Any]:
         tx = {
             "tx_id": tx_id or str(uuid.uuid4()),
@@ -264,6 +265,8 @@ class LedgerStore:
         }
         if note:
             tx["note"] = note
+        if signature:
+            tx["signature"] = signature
         return tx
 
     def _calculate_balance_unlocked(self, account: str) -> float:
@@ -449,12 +452,20 @@ class LedgerStore:
     def _node_status_from_snapshot(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
         blocks = snapshot.get("blocks", [])
         meta = snapshot.get("meta", {})
+        
+        # --- 新增防護：強制重新計算最後一個區塊的 Hash，不信任檔案內儲存的字串 ---
+        last_block_hash = None
+        if blocks:
+            # 呼叫頂部的 compute_block_hash，根據當下讀取到的交易內容當場計算 SHA256
+            last_block_hash = compute_block_hash(blocks[-1])
+        # -------------------------------------------------------------------------
+
         return {
             "node_id": snapshot["node_id"],
             "block_count": len(blocks),
             "pending_count": len(snapshot.get("pending_transactions", [])),
             "last_block_id": blocks[-1]["block_id"] if blocks else None,
-            "last_block_hash": blocks[-1].get("block_hash") if blocks else None,
+            "last_block_hash": last_block_hash,  # <- 這裡改用我們剛剛動態算出來的真實 Hash
             "last_updated_at": meta.get("last_updated_at"),
             "last_sync_at": meta.get("last_sync_at"),
             "last_sync_source": meta.get("last_sync_source"),
@@ -531,7 +542,7 @@ class LedgerStore:
                             continue
         return {"handled_by": NODE_ID, "node_id": NODE_ID, "entries": entries[-max(1, limit):]}
 
-    def add_transaction(self, sender: str, recipient: str, amount: float, replicate: bool = True) -> Dict[str, Any]:
+    def add_transaction(self, sender: str, recipient: str, amount: float, replicate: bool = True, signature: Optional[str] = None) -> Dict[str, Any]:
         if sender == recipient:
             raise ValueError("Sender and recipient must be different.")
         if amount <= 0:
@@ -540,11 +551,29 @@ class LedgerStore:
         with FileLock(LOCK_FILE):
             self._ensure_initialized()
             if sender not in {"SYSTEM", ANGEL_ACCOUNT}:
+                # --- 新增：驗證數位簽章防護防線 ---
+                if not signature:
+                    raise ValueError(f"Transaction rejected: Missing digital signature for {sender}.")
+                try:
+                    import rsa
+                    import binascii
+                    pub_key_path = Path(f"/app/{sender}_pub.pem")
+                    if not pub_key_path.exists():
+                        raise ValueError(f"Public key for {sender} not found. Cannot verify signature.")
+                    with pub_key_path.open("rb") as f:
+                        pub_key = rsa.PublicKey.load_pkcs1(f.read())
+                    message = f"{sender},{recipient},{amount}".encode('utf-8')
+                    signature_bytes = binascii.unhexlify(signature)
+                    rsa.verify(message, signature_bytes, pub_key)
+                except Exception as e:
+                    raise ValueError(f"Invalid digital signature: {str(e)}")
+                # --------------------------------
+
                 available = self._calculate_balance_unlocked(sender)
                 if available < amount:
                     raise ValueError(f"Insufficient balance. {sender} has {available:.2f}.")
 
-            tx = self._new_transaction("transfer", sender, recipient, amount)
+            tx = self._new_transaction("transfer", sender, recipient, amount, signature=signature)
             pending = self._append_pending_unlocked(tx)
             auto_block = None
             if len(pending) >= BLOCK_SIZE:
@@ -714,8 +743,18 @@ class LedgerHandler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
         self.wfile.write(body)
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(HTTPStatus.OK)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
 
     def _send_json(self, status: int, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, indent=2, ensure_ascii=True).encode("utf-8")
@@ -799,6 +838,7 @@ class LedgerHandler(BaseHTTPRequestHandler):
                     recipient=str(payload["to"]).strip(),
                     amount=float(payload["amount"]),
                     replicate=bool(payload.get("replicate", True)),
+                    signature=payload.get("signature")
                 )
                 self._send_json(HTTPStatus.CREATED, result)
                 return

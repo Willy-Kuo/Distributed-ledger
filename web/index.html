@@ -96,6 +96,10 @@
               金額
               <input name="amount" type="number" min="0.01" step="0.01" placeholder="10" required />
             </label>
+            <label>
+              數位簽章 (RSA-256)
+              <input name="signature" placeholder="請填寫私鑰簽章 (Hex) 驗證身分" required />
+            </label>
             <button type="submit">送出交易</button>
           </form>
           <form id="chain-form" class="stack-form">
@@ -117,6 +121,7 @@
             <button id="leaderboard-button" class="secondary" type="button">排行榜</button>
             <button id="operations-button" class="secondary" type="button">操作紀錄</button>
             <button id="chain-button" class="secondary" type="button">查看完整區塊鏈</button>
+            <button id="repair-button" class="danger-button" type="button">🔧 自動修復 (多數決)</button>
           </div>
           <form id="tx-form" class="stack-form compact">
             <label>
