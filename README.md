@@ -84,7 +84,7 @@
 第一次啟動或改完程式後：
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 docker compose restart
 ```
 

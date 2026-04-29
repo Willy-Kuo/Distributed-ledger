@@ -3,6 +3,7 @@ import json
 import os
 import time
 import uuid
+import rsa
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -601,6 +602,35 @@ class LedgerStore:
             "created_block_file": block_filename(auto_block["block_id"]) if auto_block else None,
             "sync_results": sync_results,
         }
+    
+    def create_account(self, username: str, initial_balance: float) -> Dict[str, Any]:
+        username = username.strip()
+        # 1. 在記憶體中產生 RSA 金鑰對
+        pub_key, priv_key = rsa.newkeys(512)
+        pub_pem = pub_key.save_pkcs1()
+        priv_pem = priv_key.save_pkcs1()
+
+        # 2. 僅儲存「公鑰」至容器中 (用於未來的交易驗證)
+        pub_path = Path(f"/app/{username}_pub.pem")
+        with pub_path.open("wb") as f:
+            f.write(pub_pem)
+
+        # 🚨 注意：這裡我們「不」寫入 priv_path，容器內將不存在私鑰檔案
+
+        # 3. 撥款初始金額 (由 SYSTEM 發起)
+        with FileLock(LOCK_FILE):
+            self._ensure_initialized()
+            tx = self._new_transaction("system_grant", "SYSTEM", username, initial_balance)
+            self._append_pending_unlocked(tx)
+            self._touch_meta_unlocked(updated_at=utc_now(), sync_source=NODE_ID)
+
+        # 4. 將私鑰回傳給前端，由使用者自行保存
+        return {
+            "message": f"帳戶 {username} 建立成功",
+            "username": username,
+            "private_key_pem": priv_pem.decode('utf-8'), # 傳給前端顯示
+            "note": "⚠️ 伺服器未儲存私鑰，請務必複製保存，否則將無法進行轉帳！"
+        }
 
     def mine_pending(self, miner: str, replicate: bool = True) -> Dict[str, Any]:
         with FileLock(LOCK_FILE):
@@ -863,6 +893,14 @@ class LedgerHandler(BaseHTTPRequestHandler):
             if parsed.path == "/sync":
                 payload = self._read_json()
                 self._send_json(HTTPStatus.OK, STORE.apply_snapshot(payload))
+                return
+            if parsed.path == "/account/create":
+                payload = self._read_json()
+                result = STORE.create_account(
+                    username=str(payload["username"]),
+                    initial_balance=float(payload.get("initial_balance", 0))
+                )
+                self._send_json(HTTPStatus.CREATED, result)
                 return
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "Endpoint not found."})
         except ValueError as exc:

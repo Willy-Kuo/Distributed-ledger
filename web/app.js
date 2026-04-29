@@ -58,7 +58,6 @@ async function refreshSummary() {
     nodes.reduce((sum, node) => sum + (node.pending_count || 0), 0),
   );
   
-  // 更新一致性燈號與文字
   const consText = document.getElementById("summary-consistency");
   if (consistency.consistent) {
       consText.textContent = "✅ 一致";
@@ -73,6 +72,41 @@ async function refreshSummary() {
   heroNode.textContent = handledBy;
 }
 
+// ==========================================
+// 1. 帳戶管理：建立新帳戶
+// ==========================================
+document.getElementById("create-account-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const form = new FormData(e.currentTarget);
+  
+  await runAction("建立新帳戶", async () => {
+    const data = await callApi("/account/create", {
+      method: "POST",
+      body: JSON.stringify({
+        username: form.get("username"),
+        initial_balance: Number(form.get("initial_balance"))
+      })
+    });
+
+    if (data.private_key_pem) {
+        document.getElementById("priv-key-display").style.display = "block";
+        document.getElementById("priv-key-text").value = data.private_key_pem;
+    }
+    return data;
+  });
+  await refreshSummary();
+});
+
+window.copyPrivKey = function() {
+    const text = document.getElementById("priv-key-text");
+    text.select();
+    document.execCommand("copy");
+    alert("私鑰已複製到剪貼簿！");
+};
+
+// ==========================================
+// 2. 帳戶查詢
+// ==========================================
 document.getElementById("balance-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -85,20 +119,48 @@ document.getElementById("log-form").addEventListener("submit", async (event) => 
   await runAction("查詢交易紀錄", () => callApi(`/log/${encodeURIComponent(form.get("account"))}`));
 });
 
+// ==========================================
+// 3. 轉帳與驗鏈 (本地安全簽章)
+// ==========================================
 document.getElementById("transaction-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  await runAction("送出交易", () =>
-    callApi("/transaction", {
+  const sender = form.get("from");
+  const recipient = form.get("to");
+  const amount = Number(form.get("amount"));
+  const privKeyPem = form.get("privateKeyPem");
+
+  await runAction("送出交易 (本地簽章安全模式)", () => {
+    let signatureHex = "";
+    
+    try {
+        const privateKey = forge.pki.privateKeyFromPem(privKeyPem);
+        
+        // 為了與 Python 後端的 float() 保持一致，整數自動補上 .0
+        let amountStr = amount.toString();
+        if (Number.isInteger(amount)) {
+            amountStr += ".0";
+        }
+
+        const md = forge.md.sha256.create();
+        md.update(`${sender},${recipient},${amountStr}`, 'utf8');
+        
+        const signature = privateKey.sign(md);
+        signatureHex = forge.util.bytesToHex(signature);
+    } catch (err) {
+        throw new Error("私鑰格式錯誤或無效！無法產生簽章。");
+    }
+
+    return callApi("/transaction", {
       method: "POST",
       body: JSON.stringify({
-        from: form.get("from"),
-        to: form.get("to"),
-        amount: Number(form.get("amount")),
-        signature: form.get("signature") // 新增：傳遞數位簽章
+        from: sender,
+        to: recipient,
+        amount: amount,
+        signature: signatureHex 
       }),
-    }),
-  );
+    });
+  });
   await refreshSummary();
 });
 
@@ -123,6 +185,9 @@ document.getElementById("tx-form").addEventListener("submit", async (event) => {
   await runAction("查詢交易", () => callApi(`/tx/${encodeURIComponent(form.get("txId"))}`));
 });
 
+// ==========================================
+// 4. 節點與分析 (包含自動修復多數決)
+// ==========================================
 document.getElementById("status-button").addEventListener("click", async () => {
   await runAction("節點狀態查詢", () => callApi("/status"));
   await refreshSummary();
@@ -133,7 +198,6 @@ document.getElementById("consistency-button").addEventListener("click", async ()
   await refreshSummary();
 });
 
-// 新增：多數決自動修復功能
 document.getElementById("repair-button").addEventListener("click", async () => {
   await runAction("自動修復共識 (多數決)", async () => {
       const consistency = await callApi("/status/consistency");
@@ -148,7 +212,6 @@ document.getElementById("repair-button").addEventListener("click", async () => {
           if (h) hashCounts[h] = (hashCounts[h] || 0) + 1;
       });
       
-      // 找出獲得最多票數的 Hash
       const majorityHash = Object.keys(hashCounts).reduce((a, b) => hashCounts[a] > hashCounts[b] ? a : b);
       const sourceNodeInfo = nodes.find(n => n.last_block_hash === majorityHash);
       if (!sourceNodeInfo) throw new Error("無法找到多數決正確節點");
@@ -156,12 +219,10 @@ document.getElementById("repair-button").addEventListener("click", async () => {
       const portMap = { "node1": 8001, "node2": 8002, "node3": 8003 };
       const sourcePort = portMap[sourceNodeInfo.node_id];
 
-      // 【關鍵修正】使用 .text() 取得未經 JS 解析的原始字串，保留 Python 的 .0 格式
       const snapRes = await fetch(`http://localhost:${sourcePort}/chain`);
       if (!snapRes.ok) throw new Error("無法從正確節點下載快照");
       const snapshotText = await snapRes.text();
 
-      // 針對錯誤節點進行強制覆寫 (/sync)
       const repairResults = [];
       for (const n of nodes) {
          if (n.last_block_hash !== majorityHash) {
@@ -170,7 +231,7 @@ document.getElementById("repair-button").addEventListener("click", async () => {
                  const syncRes = await fetch(`http://localhost:${badPort}/sync`, {
                      method: 'POST',
                      headers: { 'Content-Type': 'application/json' },
-                     body: snapshotText // 直接傳遞原始字串，不透過 JSON.stringify
+                     body: snapshotText 
                  });
                  repairResults.push({ node: n.node_id, status: syncRes.ok ? "✅ 修復成功" : "❌ 修復失敗" });
              } catch (e) {
