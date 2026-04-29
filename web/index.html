@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Distributed Ledger Console</title>
+    <title>Three Node Ledger Console</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -11,19 +11,20 @@
       <header class="hero">
         <div>
           <p class="eyebrow">Docker Distributed Ledger</p>
-          <h1>分散式帳本控制台</h1>
+          <h1>Three Node Ledger Console</h1>
           <p class="hero-copy">
-            在同一個介面操作查餘額、轉帳、驗鏈、節點狀態與同步一致性。每個節點各自提供這個頁面，你目前看到的是
-            <span id="current-node">載入中</span>。
+            One web console for node1, node2, and node3. Switch the active node,
+            compare cluster status, submit transactions, and inspect responses
+            as visual summaries plus raw JSON.
           </p>
         </div>
         <div class="hero-meta">
           <div class="meta-card">
-            <span>目前節點</span>
+            <span>Active node</span>
             <strong id="hero-node">-</strong>
           </div>
           <div class="meta-card">
-            <span>快捷入口</span>
+            <span>Open node</span>
             <div class="quick-links">
               <a href="http://localhost:8001" target="_blank" rel="noreferrer">node1</a>
               <a href="http://localhost:8002" target="_blank" rel="noreferrer">node2</a>
@@ -36,108 +37,137 @@
       <main class="dashboard">
         <section class="panel panel-wide">
           <div class="panel-head">
-            <h2>即時摘要</h2>
-            <button id="refresh-summary" class="ghost-button">重新整理</button>
+            <div>
+              <h2>Cluster Overview</h2>
+              <span id="cluster-caption">Waiting for nodes</span>
+            </div>
+            <button id="refresh-summary" class="ghost-button" type="button">Refresh</button>
           </div>
+
           <div class="summary-grid">
             <div class="summary-card">
-              <span>節點數</span>
-              <strong id="summary-node-count">-</strong>
+              <span>Online nodes</span>
+              <strong id="summary-online">-</strong>
             </div>
             <div class="summary-card">
-              <span>最後區塊數</span>
+              <span>Total nodes</span>
+              <strong id="summary-node-count">3</strong>
+            </div>
+            <div class="summary-card">
+              <span>Max blocks</span>
               <strong id="summary-block-count">-</strong>
             </div>
             <div class="summary-card">
-              <span>Pending 交易</span>
-              <strong id="summary-pending">-</strong>
-            </div>
-            <div class="summary-card">
-              <span>一致性</span>
+              <span>Consistency</span>
               <strong id="summary-consistency">-</strong>
             </div>
           </div>
+
+          <div id="node-grid" class="node-grid" aria-live="polite"></div>
+        </section>
+
+        <section class="panel panel-wide control-strip">
+          <div class="panel-head compact-head">
+            <div>
+              <h2>Active Node</h2>
+              <span>Requests are sent to the selected node. Mutations are replicated by the backend peer settings.</span>
+            </div>
+          </div>
+          <div id="node-tabs" class="node-tabs" role="tablist" aria-label="Select active node"></div>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>帳戶查詢</h2>
+            <h2>Account Lookup</h2>
           </div>
           <form id="balance-form" class="stack-form">
             <label>
-              帳戶名稱
+              Account
               <input name="account" placeholder="alice" required />
             </label>
-            <button type="submit">查詢餘額</button>
+            <button type="submit">Check Balance</button>
           </form>
           <form id="log-form" class="stack-form">
             <label>
-              帳戶名稱
+              Account
               <input name="account" placeholder="alice" required />
             </label>
-            <button type="submit" class="secondary">查詢交易紀錄</button>
+            <button type="submit" class="secondary">Account Log</button>
           </form>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>轉帳與驗鏈</h2>
+            <h2>Transactions</h2>
           </div>
           <form id="transaction-form" class="stack-form">
             <label>
-              轉出帳戶
+              From
               <input name="from" placeholder="alice" required />
             </label>
             <label>
-              轉入帳戶
+              To
               <input name="to" placeholder="bob" required />
             </label>
             <label>
-              金額
+              Amount
               <input name="amount" type="number" min="0.01" step="0.01" placeholder="10" required />
             </label>
-            <button type="submit">送出交易</button>
+            <button type="submit">Submit Transaction</button>
           </form>
           <form id="chain-form" class="stack-form">
             <label>
-              驗鏈獎勵帳戶
+              Reward account
               <input name="rewardTo" placeholder="auditor" />
             </label>
-            <button type="submit" class="secondary">檢查區塊鏈</button>
+            <button type="submit" class="secondary">Check Chain</button>
           </form>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>節點與分析</h2>
+            <h2>Node Tools</h2>
           </div>
           <div class="button-stack">
-            <button id="status-button" class="secondary" type="button">節點狀態</button>
-            <button id="consistency-button" class="secondary" type="button">一致性檢查</button>
-            <button id="leaderboard-button" class="secondary" type="button">排行榜</button>
-            <button id="operations-button" class="secondary" type="button">操作紀錄</button>
-            <button id="chain-button" class="secondary" type="button">查看完整區塊鏈</button>
+            <button id="status-button" class="secondary" type="button">Cluster Status</button>
+            <button id="consistency-button" class="secondary" type="button">Consistency</button>
+            <button id="leaderboard-button" class="secondary" type="button">Leaderboard</button>
+            <button id="operations-button" class="secondary" type="button">Operations</button>
+            <button id="chain-button" class="secondary" type="button">View Chain</button>
+            <button id="health-button" class="secondary" type="button">Health Check</button>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <h2>Transaction Search</h2>
           </div>
           <form id="tx-form" class="stack-form compact">
             <label>
-              交易 ID
-              <input name="txId" id="tx-id-input" placeholder="貼上 tx_id" required />
+              Transaction ID
+              <input name="txId" id="tx-id-input" placeholder="Paste tx_id" required />
             </label>
-            <button type="submit" class="secondary">查詢交易</button>
+            <button type="submit" class="secondary">Find Transaction</button>
           </form>
         </section>
 
         <section class="panel panel-wide result-panel">
           <div class="panel-head">
-            <h2>回應結果</h2>
+            <h2>Output</h2>
             <div class="result-actions">
-              <span id="result-status">等待操作</span>
-              <button id="copy-result" class="ghost-button" type="button">複製 JSON</button>
+              <span id="result-status">Ready</span>
+              <button id="copy-result" class="ghost-button" type="button">Copy JSON</button>
             </div>
           </div>
-          <pre id="result-output">{
+          <div id="result-visual" class="result-visual">
+            <div class="empty-state">Run an action to see a visual summary.</div>
+          </div>
+          <details class="json-details" open>
+            <summary>Raw JSON</summary>
+            <pre id="result-output">{
   "message": "GUI ready"
 }</pre>
+          </details>
         </section>
       </main>
     </div>
