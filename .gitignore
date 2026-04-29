@@ -7,3 +7,5 @@ share/nodes/
 share/ledger.json
 share_test/
 share_test_cluster/
+tools/
+tunnels/
