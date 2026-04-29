@@ -14,11 +14,16 @@ function getApiProtocol() {
   return (params.get("apiProtocol") || "http").replace(/:$/, "");
 }
 
+function normalizeOrigin(value) {
+  return String(value || "").trim().replace(/\/+$/, "");
+}
+
 const API_HOST = getApiHost();
 const API_PROTOCOL = getApiProtocol();
+const URL_PARAMS = new URLSearchParams(window.location.search);
 const NODES = NODE_PORTS.map((node) => ({
   ...node,
-  origin: `${API_PROTOCOL}://${API_HOST}:${node.port}`,
+  origin: normalizeOrigin(URL_PARAMS.get(node.id)) || `${API_PROTOCOL}://${API_HOST}:${node.port}`,
 }));
 
 const resultOutput = document.getElementById("result-output");
