@@ -4,6 +4,12 @@ const NODE_PORTS = [
   { id: "node3", port: "8003" },
 ];
 
+const DEFAULT_PUBLIC_NODES = {
+  node1: "https://continues-expression-excessive-flexible.trycloudflare.com",
+  node2: "https://stopping-environmental-hay-attacks.trycloudflare.com",
+  node3: "https://oecd-murphy-crew-letters.trycloudflare.com",
+};
+
 function getApiHost() {
   const params = new URLSearchParams(window.location.search);
   return params.get("apiHost") || window.location.hostname || "localhost";
@@ -18,12 +24,20 @@ function normalizeOrigin(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
+function shouldUseDefaultPublicNodes() {
+  const host = window.location.hostname;
+  return host.endsWith("github.io") || host.endsWith("trycloudflare.com");
+}
+
 const API_HOST = getApiHost();
 const API_PROTOCOL = getApiProtocol();
 const URL_PARAMS = new URLSearchParams(window.location.search);
 const NODES = NODE_PORTS.map((node) => ({
   ...node,
-  origin: normalizeOrigin(URL_PARAMS.get(node.id)) || `${API_PROTOCOL}://${API_HOST}:${node.port}`,
+  origin:
+    normalizeOrigin(URL_PARAMS.get(node.id)) ||
+    (shouldUseDefaultPublicNodes() ? DEFAULT_PUBLIC_NODES[node.id] : "") ||
+    `${API_PROTOCOL}://${API_HOST}:${node.port}`,
 }));
 
 const resultOutput = document.getElementById("result-output");
