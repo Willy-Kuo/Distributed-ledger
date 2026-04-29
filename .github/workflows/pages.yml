@@ -1,4 +1,4 @@
-name: Deploy web dashboard
+name: Publish web dashboard
 
 on:
   push:
@@ -7,32 +7,31 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: false
+  contents: write
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout v3
         uses: actions/checkout@v4
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload web dashboard
-        uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          fetch-depth: 0
 
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish web folder to gh-pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/dashboard-pages
+          mkdir -p /tmp/dashboard-pages
+          cp -R web/. /tmp/dashboard-pages/
+          touch /tmp/dashboard-pages/.nojekyll
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout --orphan gh-pages-work
+          git rm -rf . >/dev/null 2>&1 || true
+          cp -R /tmp/dashboard-pages/. .
+          git add .
+          git commit -m "Publish web dashboard" || exit 0
+          git push --force origin HEAD:gh-pages
