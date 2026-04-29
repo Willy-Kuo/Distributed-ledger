@@ -77,7 +77,7 @@ function shortHash(value) {
 function formatValue(value) {
   if (value === null || value === undefined || value === "") return "-";
   if (typeof value === "number") return Number.isInteger(value) ? String(value) : value.toFixed(2);
-  if (typeof value === "boolean") return value ? "yes" : "no";
+  if (typeof value === "boolean") return value ? "是" : "否";
   return String(value);
 }
 
@@ -91,7 +91,7 @@ function setStatus(text, isError = false) {
 }
 
 function setVisual(html) {
-  resultVisual.innerHTML = html || '<div class="empty-state">No visual data available.</div>';
+  resultVisual.innerHTML = html || '<div class="empty-state">沒有可視化資料。</div>';
 }
 
 function metric(label, value, tone = "") {
@@ -107,7 +107,7 @@ function badge(text, tone = "") {
   return `<span class="status-badge ${tone}">${escapeHtml(text)}</span>`;
 }
 
-function table(rows, columns, emptyText = "No rows") {
+function table(rows, columns, emptyText = "沒有資料") {
   if (!rows || rows.length === 0) {
     return `<div class="empty-state">${escapeHtml(emptyText)}</div>`;
   }
@@ -142,7 +142,7 @@ function signTransaction(sender, recipient, amount, privateKeyPem) {
     return null;
   }
   if (!window.forge) {
-    throw new Error("The RSA signing library did not load. Check the network connection.");
+    throw new Error("RSA 簽章函式庫尚未載入，請檢查網路連線。");
   }
   const privateKey = window.forge.pki.privateKeyFromPem(privateKeyPem);
   const digest = window.forge.md.sha256.create();
@@ -152,13 +152,13 @@ function signTransaction(sender, recipient, amount, privateKeyPem) {
 
 function txColumns() {
   return [
-    { label: "Time", value: (row) => row.timestamp || row.created_at },
-    { label: "Type", key: "type" },
-    { label: "From", key: "from" },
-    { label: "To", key: "to" },
-    { label: "Amount", key: "amount" },
-    { label: "Status", key: "status" },
-    { label: "Block", value: (row) => row.block_id || row.block_file },
+    { label: "時間", value: (row) => row.timestamp || row.created_at },
+    { label: "類型", key: "type" },
+    { label: "付款方", key: "from" },
+    { label: "收款方", key: "to" },
+    { label: "金額", key: "amount" },
+    { label: "狀態", key: "status" },
+    { label: "區塊", value: (row) => row.block_id || row.block_file },
   ];
 }
 
@@ -171,16 +171,16 @@ function nodeStatusCards(nodes = []) {
             <article class="visual-card">
               <div class="visual-card-head">
                 <h3>${escapeHtml(node.node_id)}</h3>
-                ${badge(node.online === false ? "offline" : "available", node.online === false ? "bad" : "ok")}
+                ${badge(node.online === false ? "離線" : "可用", node.online === false ? "bad" : "ok")}
               </div>
               <div class="mini-metrics">
-                ${metric("Blocks", node.block_count ?? "-")}
+                ${metric("區塊數", node.block_count ?? "-")}
                 ${metric("Pending", node.pending_count ?? "-")}
-                ${metric("Last block", node.last_block_id ?? "-")}
+                ${metric("最後區塊", node.last_block_id ?? "-")}
               </div>
               <dl class="visual-list">
-                <div><dt>Sync source</dt><dd>${escapeHtml(node.last_sync_source || "-")}</dd></div>
-                <div><dt>Last hash</dt><dd title="${escapeHtml(node.last_block_hash || "")}">${escapeHtml(shortHash(node.last_block_hash))}</dd></div>
+                <div><dt>同步來源</dt><dd>${escapeHtml(node.last_sync_source || "-")}</dd></div>
+                <div><dt>最後 Hash</dt><dd title="${escapeHtml(node.last_block_hash || "")}">${escapeHtml(shortHash(node.last_block_hash))}</dd></div>
               </dl>
             </article>
           `,
@@ -198,10 +198,10 @@ function renderClusterVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Active node", payload.active_node || payload.handled_by || activeNodeId)}
-        ${metric("Online", `${onlineCount}/${NODES.length}`, onlineCount === NODES.length ? "ok" : "warn")}
-        ${metric("Max blocks", Math.max(0, ...nodes.map((node) => node.block_count || 0)))}
-        ${metric("Consistent", consistent === undefined ? "-" : consistent ? "yes" : "no", consistent ? "ok" : "bad")}
+        ${metric("操作節點", payload.active_node || payload.handled_by || activeNodeId)}
+        ${metric("線上", `${onlineCount}/${NODES.length}`, onlineCount === NODES.length ? "ok" : "warn")}
+        ${metric("最高區塊數", Math.max(0, ...nodes.map((node) => node.block_count || 0)))}
+        ${metric("一致", consistent === undefined ? "-" : consistent ? "是" : "否", consistent ? "ok" : "bad")}
       </div>
       ${nodeStatusCards(nodes)}
     </div>
@@ -212,9 +212,9 @@ function renderConsistencyVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Handled by", payload.handled_by || activeNodeId)}
-        ${metric("Consistent", payload.consistent ? "yes" : "no", payload.consistent ? "ok" : "bad")}
-        ${metric("Reference hashes", payload.reference_hashes?.length || 0)}
+        ${metric("處理節點", payload.handled_by || activeNodeId)}
+        ${metric("一致", payload.consistent ? "是" : "否", payload.consistent ? "ok" : "bad")}
+        ${metric("參考 Hash 數", payload.reference_hashes?.length || 0)}
       </div>
       ${nodeStatusCards(payload.nodes || [])}
     </div>
@@ -225,9 +225,9 @@ function renderBalanceVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Account", payload.account)}
-        ${metric("Balance", payload.balance)}
-        ${metric("Node", payload.node_id || payload.handled_by || activeNodeId)}
+        ${metric("帳戶", payload.account)}
+        ${metric("餘額", payload.balance)}
+        ${metric("節點", payload.node_id || payload.handled_by || activeNodeId)}
       </div>
     </div>
   `;
@@ -237,12 +237,12 @@ function renderAccountCreateVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Account", payload.username)}
-        ${metric("Initial balance", payload.initial_balance)}
-        ${metric("Node", payload.handled_by || activeNodeId)}
+        ${metric("帳戶", payload.username)}
+        ${metric("初始餘額", payload.initial_balance)}
+        ${metric("節點", payload.handled_by || activeNodeId)}
         ${metric("Pending", payload.pending_count ?? "-")}
       </div>
-      <div class="success-note">Account created. Copy and store the private key from the account panel.</div>
+      <div class="success-note">帳戶已建立。請從帳戶面板複製並妥善保存私鑰。</div>
     </div>
   `;
 }
@@ -254,23 +254,23 @@ function renderTransactionVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Handled by", payload.handled_by || activeNodeId)}
+        ${metric("處理節點", payload.handled_by || activeNodeId)}
         ${metric("Pending", payload.pending_count ?? "-")}
-        ${metric("Auto block", autoBlock ? autoBlock.block_id : "-")}
+        ${metric("自動區塊", autoBlock ? autoBlock.block_id : "-")}
       </div>
       ${table([tx], [
         { label: "tx_id", key: "tx_id" },
-        { label: "From", key: "from" },
-        { label: "To", key: "to" },
-        { label: "Amount", key: "amount" },
-        { label: "Type", key: "type" },
+        { label: "付款方", key: "from" },
+        { label: "收款方", key: "to" },
+        { label: "金額", key: "amount" },
+        { label: "類型", key: "type" },
       ])}
-      <h3 class="visual-subhead">Replication</h3>
+      <h3 class="visual-subhead">同步結果</h3>
       ${table(syncRows, [
         { label: "Peer", key: "peer" },
-        { label: "Status", key: "status" },
-        { label: "Error", key: "error" },
-      ], "No replication rows")}
+        { label: "狀態", key: "status" },
+        { label: "錯誤", key: "error" },
+      ], "沒有同步資料")}
     </div>
   `;
 }
@@ -279,15 +279,15 @@ function renderChainCheckVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Handled by", payload.handled_by || activeNodeId)}
-        ${metric("Valid", payload.valid ? "yes" : "no", payload.valid ? "ok" : "bad")}
-        ${metric("Checked from", payload.checked_from_block)}
-        ${metric("Checked to", payload.checked_to_block)}
+        ${metric("處理節點", payload.handled_by || activeNodeId)}
+        ${metric("有效", payload.valid ? "是" : "否", payload.valid ? "ok" : "bad")}
+        ${metric("檢查起點", payload.checked_from_block)}
+        ${metric("檢查終點", payload.checked_to_block)}
       </div>
       ${
         payload.errors?.length
           ? `<div class="alert-list">${payload.errors.map((item) => `<div>${escapeHtml(item)}</div>`).join("")}</div>`
-          : '<div class="success-note">No chain errors found.</div>'
+          : '<div class="success-note">沒有發現鏈錯誤。</div>'
       }
       ${payload.reward_transaction ? renderTransactionVisual({ ...payload, transaction: payload.reward_transaction }) : ""}
     </div>
@@ -298,13 +298,13 @@ function renderLeaderboardVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Node", payload.node_id || payload.handled_by || activeNodeId)}
-        ${metric("Rows", payload.leaderboard?.length || 0)}
+        ${metric("節點", payload.node_id || payload.handled_by || activeNodeId)}
+        ${metric("筆數", payload.leaderboard?.length || 0)}
       </div>
       ${table(payload.leaderboard || [], [
-        { label: "Account", key: "account" },
-        { label: "Balance", key: "balance" },
-      ], "No leaderboard rows")}
+        { label: "帳戶", key: "account" },
+        { label: "餘額", key: "balance" },
+      ], "沒有排行榜資料")}
     </div>
   `;
 }
@@ -314,15 +314,15 @@ function renderOperationsVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Node", payload.node_id || payload.handled_by || activeNodeId)}
-        ${metric("Entries", payload.entries?.length || 0)}
+        ${metric("節點", payload.node_id || payload.handled_by || activeNodeId)}
+        ${metric("筆數", payload.entries?.length || 0)}
       </div>
       ${table(rows, [
-        { label: "Time", key: "timestamp" },
-        { label: "Node", key: "node_id" },
-        { label: "Event", key: "event" },
-        { label: "Payload", value: (row) => JSON.stringify(row.payload || {}) },
-      ], "No operation entries")}
+        { label: "時間", key: "timestamp" },
+        { label: "節點", key: "node_id" },
+        { label: "事件", key: "event" },
+        { label: "內容", value: (row) => JSON.stringify(row.payload || {}) },
+      ], "沒有操作紀錄")}
     </div>
   `;
 }
@@ -333,17 +333,17 @@ function renderTxSearchVisual(payload) {
     <div class="visual-section">
       <div class="visual-metrics">
         ${metric("tx_id", payload.tx_id)}
-        ${metric("Found", payload.found ? "yes" : "no", payload.found ? "ok" : "bad")}
-        ${metric("Matches", rows.length)}
+        ${metric("找到", payload.found ? "是" : "否", payload.found ? "ok" : "bad")}
+        ${metric("符合筆數", rows.length)}
       </div>
       ${table(rows, [
-        { label: "Node", key: "node_id" },
-        { label: "Status", key: "status" },
-        { label: "Block", value: (row) => row.block_id || row.block_file },
-        { label: "From", key: "from" },
-        { label: "To", key: "to" },
-        { label: "Amount", key: "amount" },
-      ], "No matching transactions")}
+        { label: "節點", key: "node_id" },
+        { label: "狀態", key: "status" },
+        { label: "區塊", value: (row) => row.block_id || row.block_file },
+        { label: "付款方", key: "from" },
+        { label: "收款方", key: "to" },
+        { label: "金額", key: "amount" },
+      ], "沒有符合的交易")}
     </div>
   `;
 }
@@ -360,10 +360,10 @@ function renderChainVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Node", payload.node_id || payload.handled_by || activeNodeId)}
-        ${metric("Blocks", blocks.length)}
+        ${metric("節點", payload.node_id || payload.handled_by || activeNodeId)}
+        ${metric("區塊數", blocks.length)}
         ${metric("Pending", payload.pending_transactions?.length || 0)}
-        ${metric("Data dir", payload.data_dir || "-")}
+        ${metric("資料目錄", payload.data_dir || "-")}
       </div>
       <div class="chain-strip">
         ${blocks
@@ -371,15 +371,15 @@ function renderChainVisual(payload) {
             (block) => `
               <article class="block-card">
                 <strong>#${escapeHtml(block.block_id)}</strong>
-                <span>${escapeHtml((block.transactions || []).length)} tx</span>
+                <span>${escapeHtml((block.transactions || []).length)} 筆交易</span>
                 <code title="${escapeHtml(block.block_hash || "")}">${escapeHtml(shortHash(block.block_hash))}</code>
               </article>
             `,
           )
           .join("")}
       </div>
-      <h3 class="visual-subhead">Confirmed transactions</h3>
-      ${table(transactions, txColumns(), "No confirmed transactions")}
+      <h3 class="visual-subhead">已確認交易</h3>
+      ${table(transactions, txColumns(), "沒有已確認交易")}
     </div>
   `;
 }
@@ -388,11 +388,11 @@ function renderLogVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Account", payload.account)}
-        ${metric("Transactions", payload.transactions?.length || 0)}
-        ${metric("Node", payload.node_id || activeNodeId)}
+        ${metric("帳戶", payload.account)}
+        ${metric("交易數", payload.transactions?.length || 0)}
+        ${metric("節點", payload.node_id || activeNodeId)}
       </div>
-      ${table(payload.transactions || [], txColumns(), "No transactions for this account")}
+      ${table(payload.transactions || [], txColumns(), "此帳戶沒有交易紀錄")}
     </div>
   `;
 }
@@ -401,7 +401,7 @@ function renderHealthVisual(payload) {
   return `
     <div class="visual-section">
       <div class="visual-metrics">
-        ${metric("Online", `${(payload.nodes || []).filter((node) => node.online).length}/${NODES.length}`)}
+        ${metric("線上", `${(payload.nodes || []).filter((node) => node.online).length}/${NODES.length}`)}
       </div>
       <div class="visual-card-grid">
         ${(payload.nodes || [])
@@ -410,10 +410,10 @@ function renderHealthVisual(payload) {
               <article class="visual-card">
                 <div class="visual-card-head">
                   <h3>${escapeHtml(node.node_id)}</h3>
-                  ${badge(node.online ? "online" : "offline", node.online ? "ok" : "bad")}
+                  ${badge(node.online ? "線上" : "離線", node.online ? "ok" : "bad")}
                 </div>
                 <dl class="visual-list">
-                  <div><dt>Message</dt><dd>${escapeHtml(node.error || node.payload?.status || "ok")}</dd></div>
+                  <div><dt>訊息</dt><dd>${escapeHtml(node.error || node.payload?.status || "ok")}</dd></div>
                 </dl>
               </article>
             `,
@@ -456,7 +456,7 @@ function renderVisual(payload) {
   } else if (Array.isArray(payload.blocks)) {
     setVisual(renderChainVisual(payload));
   } else {
-    setVisual(`<div class="empty-state">No specialized visualizer for this response. Use Raw JSON below.</div>`);
+    setVisual(`<div class="empty-state">這個回應沒有專用視覺化，請查看下方 Raw JSON。</div>`);
   }
 }
 
@@ -483,7 +483,7 @@ async function callActive(path, options = {}) {
 }
 
 async function runAction(label, task) {
-  setStatus(`${label} running...`);
+  setStatus(`${label}執行中...`);
   try {
     const payload = await task();
     renderResult(payload);
@@ -491,12 +491,12 @@ async function runAction(label, task) {
     if (latestTxId) {
       txIdInput.value = latestTxId;
     }
-    setStatus(`${label} complete`);
+    setStatus(`${label}完成`);
     return payload;
   } catch (error) {
     const payload = { error: error.message };
     renderResult(payload);
-    setStatus(`${label} failed`, true);
+    setStatus(`${label}失敗`, true);
     throw error;
   }
 }
@@ -541,11 +541,11 @@ function renderNodeCards(healthResults, statusNodes) {
           <h3>${escapeHtml(health.node_id)}</h3>
           <span>${escapeHtml(health.online ? "online" : "offline")}</span>
         </div>
-        <button class="mini-button" type="button" data-node="${escapeHtml(health.node_id)}">Use</button>
+        <button class="mini-button" type="button" data-node="${escapeHtml(health.node_id)}">使用</button>
       </div>
       <dl>
         <div>
-          <dt>Blocks</dt>
+          <dt>區塊數</dt>
           <dd>${escapeHtml(status.block_count ?? "-")}</dd>
         </div>
         <div>
@@ -553,11 +553,11 @@ function renderNodeCards(healthResults, statusNodes) {
           <dd>${escapeHtml(status.pending_count ?? "-")}</dd>
         </div>
         <div>
-          <dt>Sync source</dt>
+          <dt>同步來源</dt>
           <dd>${escapeHtml(status.last_sync_source ?? "-")}</dd>
         </div>
         <div>
-          <dt>Last hash</dt>
+          <dt>最後 Hash</dt>
           <dd title="${escapeHtml(status.last_block_hash || "")}">${escapeHtml(shortHash(status.last_block_hash))}</dd>
         </div>
       </dl>
@@ -594,8 +594,8 @@ async function refreshSummary() {
   document.getElementById("summary-block-count").textContent = String(
     Math.max(0, ...statusNodes.map((node) => node.block_count || 0)),
   );
-  document.getElementById("summary-consistency").textContent = consistency.consistent ? "yes" : "no";
-  clusterCaption.textContent = `Reported by ${status.handled_by || activeNodeId}, updated ${new Date().toLocaleTimeString()}`;
+  document.getElementById("summary-consistency").textContent = consistency.consistent ? "一致" : "不一致";
+  clusterCaption.textContent = `由 ${status.handled_by || activeNodeId} 回報，更新時間 ${new Date().toLocaleTimeString()}`;
 
   renderNodeCards(healthResults, statusNodes);
   return {
@@ -614,7 +614,7 @@ async function refreshAfterMutation(payload) {
 document.getElementById("create-account-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  await runAction("Create account", async () => {
+  await runAction("建立帳戶", async () => {
     const payload = await callActive("/account/create", {
       method: "POST",
       body: JSON.stringify({
@@ -632,25 +632,25 @@ document.getElementById("create-account-form").addEventListener("submit", async 
 
 document.getElementById("copy-private-key").addEventListener("click", async () => {
   await navigator.clipboard.writeText(document.getElementById("private-key-output").value);
-  setStatus("Private key copied");
+  setStatus("私鑰已複製");
 });
 
 document.getElementById("balance-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  await runAction("Check balance", () => callActive(`/balance/${encodeURIComponent(form.get("account"))}`));
+  await runAction("查詢餘額", () => callActive(`/balance/${encodeURIComponent(form.get("account"))}`));
 });
 
 document.getElementById("log-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  await runAction("Account log", () => callActive(`/log/${encodeURIComponent(form.get("account"))}`));
+  await runAction("交易紀錄", () => callActive(`/log/${encodeURIComponent(form.get("account"))}`));
 });
 
 document.getElementById("transaction-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  await runAction("Submit transaction", async () => {
+  await runAction("送出交易", async () => {
     const sender = String(form.get("from"));
     const recipient = String(form.get("to"));
     const amount = Number(form.get("amount"));
@@ -659,7 +659,7 @@ document.getElementById("transaction-form").addEventListener("submit", async (ev
     if (sender !== "angel" && sender !== "SYSTEM") {
       signature = signTransaction(sender, recipient, amount, privateKeyPem);
       if (!signature) {
-        throw new Error("Private key is required for signed account transactions.");
+        throw new Error("簽章帳戶轉帳需要貼上私鑰。");
       }
     }
     const payload = await callActive("/transaction", {
@@ -679,7 +679,7 @@ document.getElementById("chain-form").addEventListener("submit", async (event) =
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const rewardTo = String(form.get("rewardTo") || "").trim();
-  await runAction("Check chain", async () => {
+  await runAction("檢查鏈", async () => {
     const payload = await callActive("/chain/check", {
       method: "POST",
       body: JSON.stringify(rewardTo ? { reward_to: rewardTo } : {}),
@@ -691,39 +691,52 @@ document.getElementById("chain-form").addEventListener("submit", async (event) =
 document.getElementById("tx-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
-  await runAction("Find transaction", () => callActive(`/tx/${encodeURIComponent(form.get("txId"))}`));
+  await runAction("查詢交易", () => callActive(`/tx/${encodeURIComponent(form.get("txId"))}`));
 });
 
 document.getElementById("status-button").addEventListener("click", async () => {
-  await runAction("Cluster status", refreshSummary);
+  await runAction("叢集狀態", refreshSummary);
 });
 
 document.getElementById("consistency-button").addEventListener("click", async () => {
-  await runAction("Consistency", () => callActive("/status/consistency"));
+  await runAction("一致性檢查", () => callActive("/status/consistency"));
   await refreshSummary();
 });
 
 document.getElementById("leaderboard-button").addEventListener("click", async () => {
-  await runAction("Leaderboard", () => callActive("/leaderboard"));
+  await runAction("排行榜", () => callActive("/leaderboard"));
 });
 
 document.getElementById("operations-button").addEventListener("click", async () => {
-  await runAction("Operations", () => callActive("/operations"));
+  await runAction("操作紀錄", () => callActive("/operations"));
 });
 
 document.getElementById("chain-button").addEventListener("click", async () => {
-  await runAction("View chain", () => callActive("/chain"));
+  await runAction("查看鏈", () => callActive("/chain"));
 });
 
 document.getElementById("health-button").addEventListener("click", async () => {
-  await runAction("Health check", async () => ({ nodes: await getHealthResults() }));
+  await runAction("健康檢查", async () => ({ nodes: await getHealthResults() }));
+});
+
+document.getElementById("reset-node-button").addEventListener("click", async () => {
+  const confirmed = window.confirm(
+    `要把 ${activeNodeId} 清回 genesis 以示範多數決修復嗎？這只會重置目前操作節點。`,
+  );
+  if (!confirmed) {
+    return;
+  }
+  await runAction("清空目前節點", async () => {
+    const payload = await callActive("/demo/reset", { method: "POST", body: "{}" });
+    return refreshAfterMutation(payload);
+  });
 });
 
 document.getElementById("repair-button").addEventListener("click", async () => {
-  await runAction("Repair majority", async () => {
+  await runAction("多數決修復", async () => {
     const consistency = await callActive("/status/consistency");
     if (consistency.consistent) {
-      return { message: "Cluster is already consistent.", consistency };
+      return { message: "叢集目前已一致，不需要修復。", consistency };
     }
 
     const hashCounts = {};
@@ -734,13 +747,13 @@ document.getElementById("repair-button").addEventListener("click", async () => {
     }
     const hashes = Object.keys(hashCounts);
     if (!hashes.length) {
-      throw new Error("No node hashes available for majority repair.");
+      throw new Error("沒有可用的節點 Hash，無法進行多數決修復。");
     }
 
     const majorityHash = hashes.reduce((left, right) => (hashCounts[left] >= hashCounts[right] ? left : right));
     const sourceNode = (consistency.nodes || []).find((node) => node.last_block_hash === majorityHash);
     if (!sourceNode) {
-      throw new Error("Could not choose a source node for repair.");
+      throw new Error("無法選出修復來源節點。");
     }
 
     const snapshot = await callNode(sourceNode.node_id, "/chain");
@@ -754,14 +767,14 @@ document.getElementById("repair-button").addEventListener("click", async () => {
           method: "POST",
           body: JSON.stringify(snapshot),
         });
-        results.push({ node: node.node_id, status: "repaired", response });
+        results.push({ node: node.node_id, status: "已修復", response });
       } catch (error) {
-        results.push({ node: node.node_id, status: "failed", error: error.message });
+        results.push({ node: node.node_id, status: "修復失敗", error: error.message });
       }
     }
     await refreshSummary();
     return {
-      message: "Majority repair completed.",
+      message: "多數決修復完成。",
       source_node: sourceNode.node_id,
       majority_hash: majorityHash,
       results,
@@ -770,14 +783,14 @@ document.getElementById("repair-button").addEventListener("click", async () => {
 });
 
 document.getElementById("refresh-summary").addEventListener("click", async () => {
-  await runAction("Refresh", refreshSummary);
+  await runAction("重新整理", refreshSummary);
 });
 
 document.getElementById("copy-result").addEventListener("click", async () => {
   await navigator.clipboard.writeText(resultOutput.textContent);
-  setStatus("JSON copied");
+  setStatus("JSON 已複製");
 });
 
 setActiveNode(activeNodeId);
 updateQuickLinks();
-runAction("Initialize", refreshSummary).catch(() => {});
+runAction("初始化", refreshSummary).catch(() => {});

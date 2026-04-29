@@ -383,6 +383,24 @@ class LedgerStore:
             self._apply_snapshot_unlocked(snapshot)
             return {"status": "synced", "node_id": NODE_ID, "block_count": len(self._list_block_ids_unlocked())}
 
+    def reset_current_node(self) -> Dict[str, Any]:
+        with FileLock(LOCK_FILE):
+            for path in BLOCKS_DIR.glob("block_*.json"):
+                path.unlink()
+            self._initialize_unlocked()
+            self._append_operation_log_unlocked(
+                "demo_reset",
+                {"message": "Node ledger reset to genesis for majority-repair demo."},
+            )
+            snapshot = self._snapshot_unlocked()
+        return {
+            "message": "Node reset to genesis. Use Repair Majority to restore it from the majority snapshot.",
+            "handled_by": NODE_ID,
+            "node_id": NODE_ID,
+            "block_count": len(snapshot["blocks"]),
+            "pending_count": len(snapshot["pending_transactions"]),
+        }
+
     def replicate_snapshot(self, snapshot: Dict[str, Any]) -> List[Dict[str, Any]]:
         results = []
         for peer in PEERS:
@@ -944,6 +962,9 @@ class LedgerHandler(BaseHTTPRequestHandler):
                         initial_balance=float(payload.get("initial_balance", 0)),
                     ),
                 )
+                return
+            if parsed.path == "/demo/reset":
+                self._send_json(HTTPStatus.OK, STORE.reset_current_node())
                 return
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "Endpoint not found."})
         except ValueError as exc:

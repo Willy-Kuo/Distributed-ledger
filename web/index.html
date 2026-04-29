@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Three Node Ledger Console</title>
+    <title>三節點帳本控制台</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js"></script>
   </head>
@@ -12,21 +12,18 @@
       <header class="hero">
         <div>
           <p class="eyebrow">Docker Distributed Ledger</p>
-          <h1>Three Node Ledger Console</h1>
+          <h1>三節點帳本控制台</h1>
           <p class="hero-copy">
-            One web console for node1, node2, and node3. Switch the active node,
-            compare cluster status, submit transactions, and inspect responses
-            as visual summaries plus raw JSON. For public access, open the page
-            with public node endpoints in the query string.
+            在同一個網頁整合 node1、node2、node3。你可以切換操作節點、比較叢集狀態、送出簽章交易，並用可視化摘要與 Raw JSON 檢視回應。
           </p>
         </div>
         <div class="hero-meta">
           <div class="meta-card">
-            <span>Active node</span>
+            <span>目前操作節點</span>
             <strong id="hero-node">-</strong>
           </div>
           <div class="meta-card">
-            <span>Open node</span>
+            <span>開啟節點</span>
             <div class="quick-links">
               <a href="#" data-node-link="node1" target="_blank" rel="noreferrer">node1</a>
               <a href="#" data-node-link="node2" target="_blank" rel="noreferrer">node2</a>
@@ -40,27 +37,27 @@
         <section class="panel panel-wide">
           <div class="panel-head">
             <div>
-              <h2>Cluster Overview</h2>
-              <span id="cluster-caption">Waiting for nodes</span>
+              <h2>叢集總覽</h2>
+              <span id="cluster-caption">等待節點回應</span>
             </div>
-            <button id="refresh-summary" class="ghost-button" type="button">Refresh</button>
+            <button id="refresh-summary" class="ghost-button" type="button">重新整理</button>
           </div>
 
           <div class="summary-grid">
             <div class="summary-card">
-              <span>Online nodes</span>
+              <span>線上節點</span>
               <strong id="summary-online">-</strong>
             </div>
             <div class="summary-card">
-              <span>Total nodes</span>
+              <span>節點總數</span>
               <strong id="summary-node-count">3</strong>
             </div>
             <div class="summary-card">
-              <span>Max blocks</span>
+              <span>最高區塊數</span>
               <strong id="summary-block-count">-</strong>
             </div>
             <div class="summary-card">
-              <span>Consistency</span>
+              <span>一致性</span>
               <strong id="summary-consistency">-</strong>
             </div>
           </div>
@@ -71,129 +68,130 @@
         <section class="panel panel-wide control-strip">
           <div class="panel-head compact-head">
             <div>
-              <h2>Active Node</h2>
-              <span>Requests are sent to the selected node. Mutations are replicated by the backend peer settings.</span>
+              <h2>操作節點</h2>
+              <span>請求會送到選取的節點；交易與修復會依後端 peers 設定同步。</span>
             </div>
           </div>
-          <div id="node-tabs" class="node-tabs" role="tablist" aria-label="Select active node"></div>
+          <div id="node-tabs" class="node-tabs" role="tablist" aria-label="選擇操作節點"></div>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Account Lookup</h2>
+            <h2>帳戶管理</h2>
           </div>
           <form id="create-account-form" class="stack-form">
             <label>
-              New account
+              新帳戶
               <input name="username" placeholder="alice" required />
             </label>
             <label>
-              Initial balance
+              初始餘額
               <input name="initial_balance" type="number" min="0" step="0.1" value="100" required />
             </label>
-            <button type="submit">Create Account</button>
+            <button type="submit">建立帳戶</button>
           </form>
           <div id="private-key-panel" class="key-panel" hidden>
             <div class="key-panel-head">
-              <strong>Save this private key</strong>
-              <button id="copy-private-key" class="ghost-button" type="button">Copy Key</button>
+              <strong>請保存這把私鑰</strong>
+              <button id="copy-private-key" class="ghost-button" type="button">複製私鑰</button>
             </div>
             <textarea id="private-key-output" readonly></textarea>
           </div>
           <form id="balance-form" class="stack-form">
             <label>
-              Account
+              帳戶
               <input name="account" placeholder="alice" required />
             </label>
-            <button type="submit">Check Balance</button>
+            <button type="submit">查詢餘額</button>
           </form>
           <form id="log-form" class="stack-form">
             <label>
-              Account
+              帳戶
               <input name="account" placeholder="alice" required />
             </label>
-            <button type="submit" class="secondary">Account Log</button>
+            <button type="submit" class="secondary">交易紀錄</button>
           </form>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Transactions</h2>
+            <h2>交易與驗鏈</h2>
           </div>
           <form id="transaction-form" class="stack-form">
             <label>
-              From
+              付款帳戶
               <input name="from" placeholder="alice" required />
             </label>
             <label>
-              To
+              收款帳戶
               <input name="to" placeholder="bob" required />
             </label>
             <label>
-              Amount
+              金額
               <input name="amount" type="number" min="0.01" step="0.01" placeholder="10" required />
             </label>
             <label>
-              Private key
+              私鑰
               <textarea
                 name="privateKeyPem"
-                placeholder="Required for non-angel accounts created with Create Account"
+                placeholder="建立的新帳戶轉帳時需要貼上私鑰；angel / SYSTEM 不需要"
               ></textarea>
             </label>
-            <button type="submit">Submit Transaction</button>
+            <button type="submit">送出交易</button>
           </form>
           <form id="chain-form" class="stack-form">
             <label>
-              Reward account
+              驗鏈獎勵帳戶
               <input name="rewardTo" placeholder="auditor" />
             </label>
-            <button type="submit" class="secondary">Check Chain</button>
+            <button type="submit" class="secondary">檢查鏈</button>
           </form>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Node Tools</h2>
+            <h2>節點工具</h2>
           </div>
           <div class="button-stack">
-            <button id="status-button" class="secondary" type="button">Cluster Status</button>
-            <button id="consistency-button" class="secondary" type="button">Consistency</button>
-            <button id="leaderboard-button" class="secondary" type="button">Leaderboard</button>
-            <button id="operations-button" class="secondary" type="button">Operations</button>
-            <button id="chain-button" class="secondary" type="button">View Chain</button>
-            <button id="health-button" class="secondary" type="button">Health Check</button>
-            <button id="repair-button" class="danger-button" type="button">Repair Majority</button>
+            <button id="status-button" class="secondary" type="button">叢集狀態</button>
+            <button id="consistency-button" class="secondary" type="button">一致性檢查</button>
+            <button id="leaderboard-button" class="secondary" type="button">排行榜</button>
+            <button id="operations-button" class="secondary" type="button">操作紀錄</button>
+            <button id="chain-button" class="secondary" type="button">查看鏈</button>
+            <button id="health-button" class="secondary" type="button">健康檢查</button>
+            <button id="reset-node-button" class="danger-button" type="button">清空目前節點</button>
+            <button id="repair-button" class="danger-button" type="button">多數決修復</button>
           </div>
         </section>
 
         <section class="panel">
           <div class="panel-head">
-            <h2>Transaction Search</h2>
+            <h2>交易查詢</h2>
           </div>
           <form id="tx-form" class="stack-form compact">
             <label>
-              Transaction ID
-              <input name="txId" id="tx-id-input" placeholder="Paste tx_id" required />
+              交易 ID
+              <input name="txId" id="tx-id-input" placeholder="貼上 tx_id" required />
             </label>
-            <button type="submit" class="secondary">Find Transaction</button>
+            <button type="submit" class="secondary">查詢交易</button>
           </form>
         </section>
 
         <section class="panel panel-wide result-panel">
           <div class="panel-head">
-            <h2>Output</h2>
+            <h2>輸出結果</h2>
             <div class="result-actions">
-              <span id="result-status">Ready</span>
-              <button id="copy-result" class="ghost-button" type="button">Copy JSON</button>
+              <span id="result-status">準備就緒</span>
+              <button id="copy-result" class="ghost-button" type="button">複製 JSON</button>
             </div>
           </div>
           <div id="result-visual" class="result-visual">
-            <div class="empty-state">Run an action to see a visual summary.</div>
+            <div class="empty-state">執行操作後會在這裡顯示可視化摘要。</div>
           </div>
           <details class="json-details" open>
             <summary>Raw JSON</summary>
             <pre id="result-output">{
-  "message": "GUI ready"
+  "message": "GUI ready / 介面已就緒"
 }</pre>
           </details>
         </section>
