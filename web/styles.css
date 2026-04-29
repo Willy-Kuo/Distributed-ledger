@@ -252,7 +252,8 @@ label {
   font-size: 0.95rem;
 }
 
-input {
+input,
+textarea {
   width: 100%;
   padding: 11px 12px;
   border: 1px solid #c9d3df;
@@ -262,7 +263,14 @@ input {
   font-size: 1rem;
 }
 
-input:focus {
+textarea {
+  min-height: 110px;
+  font-family: Consolas, "Courier New", monospace;
+  resize: vertical;
+}
+
+input:focus,
+textarea:focus {
   border-color: var(--accent);
   outline: 3px solid rgba(37, 99, 235, 0.15);
 }
@@ -310,10 +318,40 @@ button.mini-button {
   font-size: 0.86rem;
 }
 
+button.danger-button {
+  color: #fff;
+  background: #b42318;
+}
+
+button.danger-button:hover {
+  background: #912018;
+}
+
 .button-stack {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
+}
+
+.key-panel {
+  border: 1px dashed rgba(180, 83, 9, 0.45);
+  border-radius: 8px;
+  background: #fffbeb;
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+.key-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.key-panel textarea {
+  min-height: 150px;
+  background: #fffdf5;
 }
 
 .result-panel pre {

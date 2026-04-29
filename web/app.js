@@ -119,6 +119,23 @@ function table(rows, columns, emptyText = "No rows") {
   `;
 }
 
+function signedAmountText(amount) {
+  return Number.isInteger(amount) ? `${amount}.0` : String(amount);
+}
+
+function signTransaction(sender, recipient, amount, privateKeyPem) {
+  if (!privateKeyPem.trim()) {
+    return null;
+  }
+  if (!window.forge) {
+    throw new Error("The RSA signing library did not load. Check the network connection.");
+  }
+  const privateKey = window.forge.pki.privateKeyFromPem(privateKeyPem);
+  const digest = window.forge.md.sha256.create();
+  digest.update(`${sender},${recipient},${signedAmountText(amount)}`, "utf8");
+  return window.forge.util.bytesToHex(privateKey.sign(digest));
+}
+
 function txColumns() {
   return [
     { label: "Time", value: (row) => row.timestamp || row.created_at },
@@ -202,15 +219,30 @@ function renderBalanceVisual(payload) {
   `;
 }
 
+function renderAccountCreateVisual(payload) {
+  return `
+    <div class="visual-section">
+      <div class="visual-metrics">
+        ${metric("Account", payload.username)}
+        ${metric("Initial balance", payload.initial_balance)}
+        ${metric("Node", payload.handled_by || activeNodeId)}
+        ${metric("Pending", payload.pending_count ?? "-")}
+      </div>
+      <div class="success-note">Account created. Copy and store the private key from the account panel.</div>
+    </div>
+  `;
+}
+
 function renderTransactionVisual(payload) {
   const tx = payload.transaction || payload.reward_transaction || {};
   const syncRows = payload.sync_results || [];
+  const autoBlock = payload.auto_created_block || payload.reward_created_block || payload.auto_block;
   return `
     <div class="visual-section">
       <div class="visual-metrics">
         ${metric("Handled by", payload.handled_by || activeNodeId)}
         ${metric("Pending", payload.pending_count ?? "-")}
-        ${metric("Auto block", payload.auto_block ? payload.auto_block.block_id : "-")}
+        ${metric("Auto block", autoBlock ? autoBlock.block_id : "-")}
       </div>
       ${table([tx], [
         { label: "tx_id", key: "tx_id" },
@@ -393,6 +425,8 @@ function renderVisual(payload) {
     setVisual(renderConsistencyVisual(payload));
   } else if ("balance" in payload && "account" in payload) {
     setVisual(renderBalanceVisual(payload));
+  } else if ("private_key_pem" in payload && "username" in payload) {
+    setVisual(renderAccountCreateVisual(payload));
   } else if (Array.isArray(payload.transactions) && "account" in payload) {
     setVisual(renderLogVisual(payload));
   } else if (payload.transaction || payload.reward_transaction) {
@@ -563,6 +597,30 @@ async function refreshAfterMutation(payload) {
   return payload;
 }
 
+document.getElementById("create-account-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  await runAction("Create account", async () => {
+    const payload = await callActive("/account/create", {
+      method: "POST",
+      body: JSON.stringify({
+        username: form.get("username"),
+        initial_balance: Number(form.get("initial_balance")),
+      }),
+    });
+    if (payload.private_key_pem) {
+      document.getElementById("private-key-panel").hidden = false;
+      document.getElementById("private-key-output").value = payload.private_key_pem;
+    }
+    return refreshAfterMutation(payload);
+  });
+});
+
+document.getElementById("copy-private-key").addEventListener("click", async () => {
+  await navigator.clipboard.writeText(document.getElementById("private-key-output").value);
+  setStatus("Private key copied");
+});
+
 document.getElementById("balance-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
@@ -579,12 +637,24 @@ document.getElementById("transaction-form").addEventListener("submit", async (ev
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   await runAction("Submit transaction", async () => {
+    const sender = String(form.get("from"));
+    const recipient = String(form.get("to"));
+    const amount = Number(form.get("amount"));
+    const privateKeyPem = String(form.get("privateKeyPem") || "");
+    let signature = null;
+    if (sender !== "angel" && sender !== "SYSTEM") {
+      signature = signTransaction(sender, recipient, amount, privateKeyPem);
+      if (!signature) {
+        throw new Error("Private key is required for signed account transactions.");
+      }
+    }
     const payload = await callActive("/transaction", {
       method: "POST",
       body: JSON.stringify({
-        from: form.get("from"),
-        to: form.get("to"),
-        amount: Number(form.get("amount")),
+        from: sender,
+        to: recipient,
+        amount,
+        ...(signature ? { signature } : {}),
       }),
     });
     return refreshAfterMutation(payload);
@@ -633,6 +703,56 @@ document.getElementById("chain-button").addEventListener("click", async () => {
 
 document.getElementById("health-button").addEventListener("click", async () => {
   await runAction("Health check", async () => ({ nodes: await getHealthResults() }));
+});
+
+document.getElementById("repair-button").addEventListener("click", async () => {
+  await runAction("Repair majority", async () => {
+    const consistency = await callActive("/status/consistency");
+    if (consistency.consistent) {
+      return { message: "Cluster is already consistent.", consistency };
+    }
+
+    const hashCounts = {};
+    for (const node of consistency.nodes || []) {
+      if (node.last_block_hash) {
+        hashCounts[node.last_block_hash] = (hashCounts[node.last_block_hash] || 0) + 1;
+      }
+    }
+    const hashes = Object.keys(hashCounts);
+    if (!hashes.length) {
+      throw new Error("No node hashes available for majority repair.");
+    }
+
+    const majorityHash = hashes.reduce((left, right) => (hashCounts[left] >= hashCounts[right] ? left : right));
+    const sourceNode = (consistency.nodes || []).find((node) => node.last_block_hash === majorityHash);
+    if (!sourceNode) {
+      throw new Error("Could not choose a source node for repair.");
+    }
+
+    const snapshot = await callNode(sourceNode.node_id, "/chain");
+    const results = [];
+    for (const node of consistency.nodes || []) {
+      if (node.last_block_hash === majorityHash) {
+        continue;
+      }
+      try {
+        const response = await callNode(node.node_id, "/sync", {
+          method: "POST",
+          body: JSON.stringify(snapshot),
+        });
+        results.push({ node: node.node_id, status: "repaired", response });
+      } catch (error) {
+        results.push({ node: node.node_id, status: "failed", error: error.message });
+      }
+    }
+    await refreshSummary();
+    return {
+      message: "Majority repair completed.",
+      source_node: sourceNode.node_id,
+      majority_hash: majorityHash,
+      results,
+    };
+  });
 });
 
 document.getElementById("refresh-summary").addEventListener("click", async () => {

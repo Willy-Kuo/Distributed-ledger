@@ -4,6 +4,8 @@ WORKDIR /app
 
 COPY ledger_server.py client_cli.py /app/
 
+RUN pip install --no-cache-dir rsa
+
 ENV PYTHONUNBUFFERED=1
 
 CMD ["python", "/app/ledger_server.py"]

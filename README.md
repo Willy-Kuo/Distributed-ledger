@@ -7,7 +7,8 @@
 - 圖形化 Web GUI
 - 查詢帳戶餘額 `check money`
 - 查詢交易紀錄 `check log`
-- 進行轉帳 `transaction`
+- 建立 RSA 簽章帳戶
+- 進行簽章轉帳 `transaction`
 - 驗證帳本鏈完整性 `check chain`
 - 節點狀態查詢 `status`
 - 節點一致性檢查 `consistency`
@@ -86,7 +87,7 @@
 第一次啟動或改完程式後：
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 docker compose restart
 ```
 

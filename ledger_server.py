@@ -1,4 +1,5 @@
 import hashlib
+import binascii
 import json
 import os
 import time
@@ -16,6 +17,7 @@ from urllib.request import Request, urlopen
 BASE_DIR = Path(__file__).resolve().parent
 WEB_DIR = BASE_DIR / "web"
 SHARE_DIR = Path(os.environ.get("LEDGER_SHARE_DIR", "/share"))
+KEYS_DIR = Path(os.environ.get("LEDGER_KEYS_DIR", str(BASE_DIR / "keys")))
 NODE_ID = os.environ.get("NODE_ID", "node1")
 NODE_DIR = SHARE_DIR / "nodes" / NODE_ID
 BLOCKS_DIR = NODE_DIR / "blocks"
@@ -63,6 +65,14 @@ def compute_block_hash(block: Dict[str, Any]) -> str:
         "transactions": block["transactions"],
     }
     return sha256_text(canonical_json(payload))
+
+
+def load_rsa_module():
+    try:
+        import rsa  # type: ignore
+    except ImportError as exc:
+        raise ValueError("RSA support is not installed. Rebuild the container with `docker compose up --build -d`.") from exc
+    return rsa
 
 
 def post_json(url: str, payload: Dict[str, Any], timeout: int = 5) -> Dict[str, Any]:
@@ -253,6 +263,7 @@ class LedgerStore:
         note: Optional[str] = None,
         tx_id: Optional[str] = None,
         timestamp: Optional[str] = None,
+        signature: Optional[str] = None,
     ) -> Dict[str, Any]:
         tx = {
             "tx_id": tx_id or str(uuid.uuid4()),
@@ -264,6 +275,8 @@ class LedgerStore:
         }
         if note:
             tx["note"] = note
+        if signature:
+            tx["signature"] = signature
         return tx
 
     def _calculate_balance_unlocked(self, account: str) -> float:
@@ -449,12 +462,13 @@ class LedgerStore:
     def _node_status_from_snapshot(self, snapshot: Dict[str, Any]) -> Dict[str, Any]:
         blocks = snapshot.get("blocks", [])
         meta = snapshot.get("meta", {})
+        last_block_hash = compute_block_hash(blocks[-1]) if blocks else None
         return {
             "node_id": snapshot["node_id"],
             "block_count": len(blocks),
             "pending_count": len(snapshot.get("pending_transactions", [])),
             "last_block_id": blocks[-1]["block_id"] if blocks else None,
-            "last_block_hash": blocks[-1].get("block_hash") if blocks else None,
+            "last_block_hash": last_block_hash,
             "last_updated_at": meta.get("last_updated_at"),
             "last_sync_at": meta.get("last_sync_at"),
             "last_sync_source": meta.get("last_sync_source"),
@@ -531,7 +545,37 @@ class LedgerStore:
                             continue
         return {"handled_by": NODE_ID, "node_id": NODE_ID, "entries": entries[-max(1, limit):]}
 
-    def add_transaction(self, sender: str, recipient: str, amount: float, replicate: bool = True) -> Dict[str, Any]:
+    def _verify_signature(self, sender: str, recipient: str, amount: float, signature: Optional[str]) -> bool:
+        if sender in {"SYSTEM", ANGEL_ACCOUNT}:
+            return False
+        if not signature:
+            raise ValueError(f"Transaction rejected: Missing digital signature for {sender}.")
+
+        pub_key_path = KEYS_DIR / f"{sender}_pub.pem"
+        if not pub_key_path.exists():
+            raise ValueError(f"Public key for {sender} not found. Create the account first.")
+
+        rsa = load_rsa_module()
+        with pub_key_path.open("rb") as handle:
+            public_key = rsa.PublicKey.load_pkcs1(handle.read())
+
+        message = f"{sender},{recipient},{amount}".encode("utf-8")
+        try:
+            rsa.verify(message, binascii.unhexlify(signature), public_key)
+        except (binascii.Error, ValueError) as exc:
+            raise ValueError(f"Invalid digital signature: {exc}") from exc
+        except Exception as exc:
+            raise ValueError(f"Invalid digital signature: {exc}") from exc
+        return True
+
+    def add_transaction(
+        self,
+        sender: str,
+        recipient: str,
+        amount: float,
+        replicate: bool = True,
+        signature: Optional[str] = None,
+    ) -> Dict[str, Any]:
         if sender == recipient:
             raise ValueError("Sender and recipient must be different.")
         if amount <= 0:
@@ -539,12 +583,13 @@ class LedgerStore:
 
         with FileLock(LOCK_FILE):
             self._ensure_initialized()
+            signature_verified = self._verify_signature(sender, recipient, amount, signature)
             if sender not in {"SYSTEM", ANGEL_ACCOUNT}:
                 available = self._calculate_balance_unlocked(sender)
                 if available < amount:
                     raise ValueError(f"Insufficient balance. {sender} has {available:.2f}.")
 
-            tx = self._new_transaction("transfer", sender, recipient, amount)
+            tx = self._new_transaction("transfer", sender, recipient, amount, signature=signature)
             pending = self._append_pending_unlocked(tx)
             auto_block = None
             if len(pending) >= BLOCK_SIZE:
@@ -558,6 +603,7 @@ class LedgerStore:
                     "amount": round(amount, 2),
                     "tx_id": tx["tx_id"],
                     "auto_created_block": auto_block["block_id"] if auto_block else None,
+                    "signature_verified": signature_verified,
                 },
             )
             snapshot = self._snapshot_unlocked()
@@ -570,6 +616,64 @@ class LedgerStore:
             "pending_count": len(snapshot["pending_transactions"]),
             "auto_created_block": auto_block,
             "created_block_file": block_filename(auto_block["block_id"]) if auto_block else None,
+            "sync_results": sync_results,
+        }
+
+    def create_account(self, username: str, initial_balance: float = 0.0) -> Dict[str, Any]:
+        username = username.strip()
+        if not username:
+            raise ValueError("Username is required.")
+        if username.upper() == "SYSTEM":
+            raise ValueError("SYSTEM is a reserved account.")
+        if initial_balance < 0:
+            raise ValueError("Initial balance cannot be negative.")
+
+        rsa = load_rsa_module()
+        public_key, private_key = rsa.newkeys(512)
+        KEYS_DIR.mkdir(parents=True, exist_ok=True)
+        public_key_path = KEYS_DIR / f"{username}_pub.pem"
+        if public_key_path.exists():
+            raise ValueError(f"Account key for {username} already exists.")
+
+        public_key_path.write_bytes(public_key.save_pkcs1())
+
+        auto_block = None
+        with FileLock(LOCK_FILE):
+            self._ensure_initialized()
+            tx = None
+            if initial_balance > 0:
+                tx = self._new_transaction(
+                    "system_grant",
+                    "SYSTEM",
+                    username,
+                    initial_balance,
+                    note="Initial account grant",
+                )
+                pending = self._append_pending_unlocked(tx)
+                if len(pending) >= BLOCK_SIZE:
+                    auto_block = self._flush_pending_to_block_unlocked()
+            self._touch_meta_unlocked(updated_at=utc_now(), sync_source=NODE_ID)
+            self._append_operation_log_unlocked(
+                "account_create",
+                {
+                    "username": username,
+                    "initial_balance": round(initial_balance, 2),
+                    "grant_tx_id": tx["tx_id"] if tx else None,
+                    "auto_created_block": auto_block["block_id"] if auto_block else None,
+                },
+            )
+            snapshot = self._snapshot_unlocked()
+
+        sync_results = self.replicate_snapshot(snapshot)
+        return {
+            "message": "Account created. Save the private key now; the server does not store it.",
+            "handled_by": NODE_ID,
+            "username": username,
+            "initial_balance": round(initial_balance, 2),
+            "public_key_file": str(public_key_path),
+            "private_key_pem": private_key.save_pkcs1().decode("utf-8"),
+            "pending_count": len(snapshot["pending_transactions"]),
+            "auto_created_block": auto_block,
             "sync_results": sync_results,
         }
 
@@ -805,6 +909,7 @@ class LedgerHandler(BaseHTTPRequestHandler):
                     recipient=str(payload["to"]).strip(),
                     amount=float(payload["amount"]),
                     replicate=bool(payload.get("replicate", True)),
+                    signature=payload.get("signature"),
                 )
                 self._send_json(HTTPStatus.CREATED, result)
                 return
@@ -829,6 +934,16 @@ class LedgerHandler(BaseHTTPRequestHandler):
             if parsed.path == "/sync":
                 payload = self._read_json()
                 self._send_json(HTTPStatus.OK, STORE.apply_snapshot(payload))
+                return
+            if parsed.path == "/account/create":
+                payload = self._read_json()
+                self._send_json(
+                    HTTPStatus.CREATED,
+                    STORE.create_account(
+                        username=str(payload["username"]).strip(),
+                        initial_balance=float(payload.get("initial_balance", 0)),
+                    ),
+                )
                 return
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "Endpoint not found."})
         except ValueError as exc:

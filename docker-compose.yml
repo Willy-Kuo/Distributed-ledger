@@ -2,7 +2,8 @@ name: ledger-demo
 
 services:
   node1:
-    image: python:3.11-slim
+    build: .
+    image: ledger-app:latest
     container_name: node1
     working_dir: /app
     command: ["python", "/app/ledger_server.py"]
@@ -18,7 +19,8 @@ services:
       PEER_URLS: http://node2:8000,http://node3:8000
 
   node2:
-    image: python:3.11-slim
+    build: .
+    image: ledger-app:latest
     container_name: node2
     working_dir: /app
     command: ["python", "/app/ledger_server.py"]
@@ -34,7 +36,8 @@ services:
       PEER_URLS: http://node1:8000,http://node3:8000
 
   node3:
-    image: python:3.11-slim
+    build: .
+    image: ledger-app:latest
     container_name: node3
     working_dir: /app
     command: ["python", "/app/ledger_server.py"]
@@ -50,7 +53,8 @@ services:
       PEER_URLS: http://node1:8000,http://node2:8000
 
   client1:
-    image: python:3.11-slim
+    build: .
+    image: ledger-app:latest
     container_name: client1
     working_dir: /app
     command: ["sleep", "infinity"]
@@ -63,7 +67,8 @@ services:
       LEDGER_URL: http://node1:8000
 
   client2:
-    image: python:3.11-slim
+    build: .
+    image: ledger-app:latest
     container_name: client2
     working_dir: /app
     command: ["sleep", "infinity"]
@@ -76,7 +81,8 @@ services:
       LEDGER_URL: http://node2:8000
 
   client3:
-    image: python:3.11-slim
+    build: .
+    image: ledger-app:latest
     container_name: client3
     working_dir: /app
     command: ["sleep", "infinity"]

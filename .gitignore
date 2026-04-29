@@ -9,3 +9,5 @@ share_test/
 share_test_cluster/
 tools/
 tunnels/
+keys/
+*_priv.pem
