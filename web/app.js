@@ -1,8 +1,25 @@
-const NODES = [
-  { id: "node1", origin: "http://localhost:8001" },
-  { id: "node2", origin: "http://localhost:8002" },
-  { id: "node3", origin: "http://localhost:8003" },
+const NODE_PORTS = [
+  { id: "node1", port: "8001" },
+  { id: "node2", port: "8002" },
+  { id: "node3", port: "8003" },
 ];
+
+function getApiHost() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("apiHost") || window.location.hostname || "localhost";
+}
+
+function getApiProtocol() {
+  const params = new URLSearchParams(window.location.search);
+  return (params.get("apiProtocol") || "http").replace(/:$/, "");
+}
+
+const API_HOST = getApiHost();
+const API_PROTOCOL = getApiProtocol();
+const NODES = NODE_PORTS.map((node) => ({
+  ...node,
+  origin: `${API_PROTOCOL}://${API_HOST}:${node.port}`,
+}));
 
 const resultOutput = document.getElementById("result-output");
 const resultVisual = document.getElementById("result-visual");
@@ -450,6 +467,13 @@ function renderNodeTabs() {
   }
 }
 
+function updateQuickLinks() {
+  for (const link of document.querySelectorAll("[data-node-link]")) {
+    const node = getNode(link.dataset.nodeLink);
+    link.href = node.origin;
+  }
+}
+
 function renderNodeCards(healthResults, statusNodes) {
   const statusByNode = new Map(statusNodes.map((node) => [node.node_id, node]));
   nodeGrid.innerHTML = "";
@@ -616,4 +640,5 @@ document.getElementById("copy-result").addEventListener("click", async () => {
 });
 
 setActiveNode(activeNodeId);
+updateQuickLinks();
 runAction("Initialize", refreshSummary).catch(() => {});
