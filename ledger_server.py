@@ -558,7 +558,7 @@ class LedgerStore:
                 try:
                     import rsa
                     import binascii
-                    pub_key_path = Path(f"/app/{sender}_pub.pem")
+                    pub_key_path = Path(f"/app/keys/{sender}_pub.pem")
                     if not pub_key_path.exists():
                         raise ValueError(f"Public key for {sender} not found. Cannot verify signature.")
                     with pub_key_path.open("rb") as f:
@@ -611,7 +611,9 @@ class LedgerStore:
         priv_pem = priv_key.save_pkcs1()
 
         # 2. 僅儲存「公鑰」至容器中 (用於未來的交易驗證)
-        pub_path = Path(f"/app/{username}_pub.pem")
+        keys_dir = Path("/app/keys")
+        keys_dir.mkdir(parents=True, exist_ok=True) # 確保資料夾存在
+        pub_path = keys_dir / f"{username}_pub.pem"
         with pub_path.open("wb") as f:
             f.write(pub_pem)
 
